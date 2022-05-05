@@ -1,5 +1,4 @@
 import random
-from xml.etree.ElementTree import TreeBuilder
 import torch
 
 
@@ -12,7 +11,7 @@ def synthetic_data(w, b, numer_size):
     y += torch.normal(0,0.01,y.shape)
     return X,y
 
-
+# 小批量数据的获取
 def data_iter(features, labels, batch_size):
     num_size = len(features)
     indicate = list(range(num_size))
@@ -20,6 +19,7 @@ def data_iter(features, labels, batch_size):
     for i in range(0, num_size, batch_size):
         batch_indicate = indicate[i:min(i + batch_size,num_size)]
         yield features[batch_indicate], labels[batch_indicate]    
+
 # 线性网络
 def liner_net(X,w,b):
     y = torch.mm(X,w) + b
@@ -28,6 +28,7 @@ def liner_net(X,w,b):
 def sqrt_loss(y_hat,y):
     loss = 0.5*(y_hat - y)**2
     return loss
+# 优化算法，梯度更新数据的权值
 def sgd(params, lr, batch_size):
     with torch.no_grad():
         for param in params:
@@ -52,6 +53,7 @@ batch_size = 10
 lr = 0.03
 epochs = 3
 
+# 训练过程
 for epoch in range(epochs):
     for X, y in data_iter(features, labels, batch_size):
         l = loss(net(X,w,b),y)
