@@ -26,7 +26,7 @@ def data_iter(batch_size, features, labels):
 
 # 线性神经网络
 def linreg(X,w,b):
-    return torch.matmul(X,w) + b
+    return torch.mm(X,w) + b
 # 平方损失函数
 def squared_loss(y_hat,y):
     return (y_hat - y.reshape(y_hat.shape)) **2 / 2
@@ -41,12 +41,12 @@ def sgd(params, lr, batch_size):
 
 # 参数的初始化
 w = torch.normal(0,0.01, (2,1), requires_grad=True)
-b = torch.zeros(1, requires_grad=True)
+b = torch.ones(1, requires_grad=True)
 
 # 超参数的初始化
 batch_size = 10
 lr = 0.03
-num_epochs = 1000
+num_epochs = 3
 
 # 训练的网络和损失函数的选择
 net = linreg
