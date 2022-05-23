@@ -1,39 +1,8 @@
+import os
 import torch
 from IPython import display
 from d2l import torch as d2l
 
-batch_size = 256
-train_iter, test_iter = d2l.load_data_fashion_mnist(batch_size)
-
-num_inputs = 784
-num_outputs = 10
-
-W = torch.normal(0, 0.01, size=(num_inputs, num_outputs), requires_grad=True)
-b = torch.zeros(num_outputs, requires_grad=True)
-
-X = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
-X.sum(0, keepdim=True), X.sum(1, keepdim=True)
-
-def softmax(X):
-    X_exp = torch.exp(X)
-    partition = X_exp.sum(1, keepdim=True)#partition为两行一列
-    return X_exp / partition  # 这里应用了广播机制，因为X_exp的为M 行N列,而partition为M 行 1列
-
-X = torch.normal(0, 1, (2, 5))
-X_prob = softmax(X)
-X_prob, X_prob.sum(1,keepdim=True)
-
-def net(X):
-    return softmax(torch.matmul(X.reshape((-1, W.shape[0])), W) + b)
-
-y = torch.tensor([0, 2])#这两个数据分别是第0类与第2类
-y_hat = torch.tensor([[0.1, 0.3, 0.6], [0.3, 0.2, 0.5]])
-y_hat[[0, 1], y]#直接得到第一个数据第0类的概率，第二个数据第2类的数据，因为onehot，别的类为零，不用算
-
-def cross_entropy(y_hat, y):
-    return - torch.log(y_hat[range(len(y_hat)), y])
-
-cross_entropy(y_hat, y)
 
 def accuracy(y_hat, y):  #@save
     """计算预测正确的数量"""
@@ -42,7 +11,6 @@ def accuracy(y_hat, y):  #@save
     cmp = y_hat.type(y.dtype) == y #y_hat.type(变量)，将变量进行类型转换
     return float(cmp.type(y.dtype).sum())#cmp里边存的是bool型要转换成需要的，统计几个1
 
-accuracy(y_hat, y) / len(y)
 
 def evaluate_accuracy(net, data_iter):  #@save
     """计算在指定数据集上模型的精度"""
@@ -53,6 +21,8 @@ def evaluate_accuracy(net, data_iter):  #@save
         for X, y in data_iter:
             metric.add(accuracy(net(X), y), y.numel())
     return metric[0] / metric[1]
+
+
 class Accumulator:  #@save
     """在n个变量上累加"""
     def __init__(self, n):
@@ -66,7 +36,76 @@ class Accumulator:  #@save
 
     def __getitem__(self, idx):
         return self.data[idx]
-evaluate_accuracy(net, test_iter)
+
+
+class Animator:  #@save
+    """在动画中绘制数据"""
+    def __init__(self, xlabel=None, ylabel=None, legend=None, xlim=None,
+                 ylim=None, xscale='linear', yscale='linear',
+                 fmts=('-', 'm--', 'g-.', 'r:'), nrows=1, ncols=1,
+                 figsize=(3.5, 2.5)):
+        # 增量地绘制多条线
+        if legend is None:
+            legend = []
+        d2l.use_svg_display()
+        self.fig, self.axes = d2l.plt.subplots(nrows, ncols, figsize=figsize)
+        if nrows * ncols == 1:
+            self.axes = [self.axes, ]
+        # 使用lambda函数捕获参数
+        self.config_axes = lambda: d2l.set_axes(self.axes[0], xlabel, ylabel, xlim, ylim, xscale, yscale, legend)
+        self.X, self.Y, self.fmts = None, None, fmts
+    def add(self, x, y):
+        # 向图表中添加多个数据点
+        if not hasattr(y, "__len__"):#hasattr是y的对象里是否有len的方法
+            y = [y]
+        n = len(y)
+        if not hasattr(x, "__len__"):
+            x = [x] * n
+        if not self.X:
+            self.X = [[] for _ in range(n)]
+        if not self.Y:
+            self.Y = [[] for _ in range(n)]
+        for i, (a, b) in enumerate(zip(x, y)):
+            if a is not None and b is not None:
+                self.X[i].append(a)
+                self.Y[i].append(b)
+        self.axes[0].cla()
+        for x, y, fmt in zip(self.X, self.Y, self.fmts):
+            self.axes[0].plot(x, y, fmt)
+        self.config_axes()
+        d2l.plt.pause(0.1)
+
+
+
+######################################################################
+batch_size = 256
+train_iter, test_iter = d2l.load_data_fashion_mnist(batch_size)
+
+num_inputs = 784
+num_outputs = 10
+
+W = torch.normal(0, 0.01, size=(num_inputs, num_outputs), requires_grad=True)
+b = torch.zeros(num_outputs, requires_grad=True)
+num_epochs = 10
+lr = 0.1
+
+def softmax(X):
+    X_exp = torch.exp(X)
+    partition = X_exp.sum(1, keepdim=True)#partition为两行一列
+    return X_exp / partition  # 这里应用了广播机制，因为X_exp的为M 行N列,而partition为M 行 1列
+
+
+def net(X):
+    return softmax(torch.matmul(X.reshape((-1, W.shape[0])), W) + b)
+
+
+def cross_entropy(y_hat, y):
+    return - torch.log(y_hat[range(len(y_hat)), y])
+
+
+def updater(batch_size):
+    return d2l.sgd([W, b], lr, batch_size)
+
 
 def train_epoch_ch3(net, train_iter, loss, updater):  #@save
     """训练模型一个迭代周期（定义见第3章）"""
@@ -92,50 +131,9 @@ def train_epoch_ch3(net, train_iter, loss, updater):  #@save
     # 返回训练损失和训练精度
     return metric[0] / metric[2], metric[1] / metric[2]
 
-class Animator:  #@save
-    """在动画中绘制数据"""
-    def __init__(self, xlabel=None, ylabel=None, legend=None, xlim=None,
-                 ylim=None, xscale='linear', yscale='linear',
-                 fmts=('-', 'm--', 'g-.', 'r:'), nrows=1, ncols=1,
-                 figsize=(3.5, 2.5)):
-        # 增量地绘制多条线
-        if legend is None:
-            legend = []
-        d2l.use_svg_display()
-        self.fig, self.axes = d2l.plt.subplots(nrows, ncols, figsize=figsize)
-        if nrows * ncols == 1:
-            self.axes = [self.axes, ]
-        # 使用lambda函数捕获参数
-        self.config_axes = lambda: d2l.set_axes(self.axes[0], xlabel, ylabel, xlim, ylim, xscale, yscale, legend)
-        self.X, self.Y, self.fmts = None, None, fmts
-
-    def add(self, x, y):
-        # 向图表中添加多个数据点
-        if not hasattr(y, "__len__"):
-            y = [y]
-        n = len(y)
-        if not hasattr(x, "__len__"):
-            x = [x] * n
-        if not self.X:
-            self.X = [[] for _ in range(n)]
-        if not self.Y:
-            self.Y = [[] for _ in range(n)]
-        for i, (a, b) in enumerate(zip(x, y)):
-            if a is not None and b is not None:
-                self.X[i].append(a)
-                self.Y[i].append(b)
-        self.axes[0].cla()
-        for x, y, fmt in zip(self.X, self.Y, self.fmts):
-            self.axes[0].plot(x, y, fmt)
-        self.config_axes()
-        display.display(self.fig)
-        display.clear_output(wait=True)
-
-
 def train_ch3(net, train_iter, test_iter, loss, num_epochs, updater):  #@save
     """训练模型（定义见第3章）"""
-    animator = Animator(xlabel='epoch', xlim=[1, num_epochs], ylim=[0.3, 0.9],
-                        legend=['train loss', 'train acc', 'test acc'])
+    animator = Animator(xlabel='epoch', xlim=[1, num_epochs], ylim=[0.3, 0.9],legend=['train loss', 'train acc', 'test acc'])
     for epoch in range(num_epochs):
         train_metrics = train_epoch_ch3(net, train_iter, loss, updater)
         test_acc = evaluate_accuracy(net, test_iter)
@@ -146,10 +144,5 @@ def train_ch3(net, train_iter, test_iter, loss, num_epochs, updater):  #@save
     assert test_acc <= 1 and test_acc > 0.7, test_acc
 
 
-lr = 0.1
-
-def updater(batch_size):
-    return d2l.sgd([W, b], lr, batch_size)
-
-num_epochs = 20
 train_ch3(net, train_iter, test_iter, cross_entropy, num_epochs, updater)
+os.system("pause")
